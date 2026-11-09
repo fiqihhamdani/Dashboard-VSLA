@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreMembersRequest;
 use App\Models\CashEntry;
 use App\Models\Group;
 use App\Models\Loan;
@@ -52,6 +53,19 @@ class AdminController extends Controller
         $loans = Loan::with(['member.group', 'installments' => fn ($q) => $q->withSum('payments', 'amount')->with(['payments' => fn ($p) => $p->orderBy('paid_at')->orderBy('id')])->orderBy('sequence')])->when($data['group_id'] ?? null, fn ($q, $id) => $q->whereHas('member', fn ($m) => $m->where('group_id', $id)))->when($data['q'] ?? null, fn ($q, $name) => $q->whereHas('member', fn ($m) => $m->where('name', 'like', "%$name%")))->orderByDesc('disbursed_at')->orderByDesc('id')->paginate(15)->withQueryString();
 
         return view('admin.loans', ['loans' => $loans, 'groups' => Group::orderBy('name')->get()]);
+    }
+
+    public function storeMembers(StoreMembersRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+        DB::transaction(function () use ($data) {
+            foreach ($data['members'] as $row) {
+                Member::create(['group_id' => $data['group_id'], 'is_active' => $data['is_active'], 'name' => $row['name']]);
+            }
+        }, 3);
+
+        return redirect()->route('admin.members', ['group_id' => $data['group_id']])
+            ->with('status', count($data['members']).' anggota berhasil ditambahkan ke kelompok yang dipilih.');
     }
 
     public function saveMember(Request $request, ?Member $member = null): RedirectResponse

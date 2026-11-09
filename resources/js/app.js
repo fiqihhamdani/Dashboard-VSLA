@@ -94,3 +94,53 @@ if (transaction?.dataset.kind === 'loan') {
 transaction?.addEventListener('submit', () => {
     const button = transaction.querySelector('[data-submit-transaction]'); button.disabled = true; button.textContent = 'Menyimpan…';
 });
+
+const bulkMembers = document.querySelector('[data-bulk-members]');
+if (bulkMembers) {
+    const memberRows = bulkMembers.querySelector('[data-member-rows]');
+    const addButton = bulkMembers.querySelector('[data-add-member]');
+    const saveButton = bulkMembers.querySelector('[data-save-members]');
+    const feedback = bulkMembers.querySelector('[data-paste-feedback]');
+    const template = memberRows.firstElementChild.cloneNode(true);
+    const refresh = () => {
+        [...memberRows.children].forEach((row, index) => {
+            const field = row.querySelector('input');
+            field.name = `members[${index}][name]`; field.id = `member_name_${index}`;
+            const label = row.querySelector('[data-member-label]'); label.htmlFor = field.id; label.textContent = `Nama anggota ${index + 1}`;
+            const remove = row.querySelector('[data-remove-member]'); remove.disabled = memberRows.children.length === 1; remove.setAttribute('aria-label', `Hapus anggota baris ${index + 1}`);
+        });
+        bulkMembers.querySelector('[data-member-count]').textContent = `${memberRows.children.length} / 100 baris`;
+        addButton.disabled = memberRows.children.length >= 100;
+    };
+    const appendName = (name = '') => {
+        const row = template.cloneNode(true); const field = row.querySelector('input'); field.value = name;
+        field.removeAttribute('aria-invalid'); field.removeAttribute('aria-describedby'); row.querySelectorAll('[id^=member_error_]').forEach(error => error.remove());
+        memberRows.append(row); return field;
+    };
+    addButton.addEventListener('click', () => {
+        if (memberRows.children.length >= 100) return;
+        const field = appendName(); refresh(); field.focus();
+    });
+    memberRows.addEventListener('click', event => {
+        const button = event.target.closest('[data-remove-member]');
+        if (!button || memberRows.children.length <= 1) return;
+        button.closest('[data-member-row]').remove();
+        memberRows.querySelectorAll('[id^=member_error_]').forEach(error => error.remove());
+        memberRows.querySelectorAll('input').forEach(field => { field.removeAttribute('aria-invalid'); field.removeAttribute('aria-describedby'); });
+        refresh();
+    });
+    bulkMembers.querySelector('[data-import-names]').addEventListener('click', () => {
+        const textarea = bulkMembers.querySelector('#pasted_names');
+        const names = textarea.value.split(/\r\n|\n|\r/).map(name => name.trim()).filter(Boolean);
+        if (!names.length) { feedback.textContent = 'Tempel setidaknya satu nama terlebih dahulu.'; return; }
+        if (names.some(name => name.includes('\t'))) { feedback.textContent = 'Salin satu kolom nama saja dari Excel, tanpa kolom tambahan.'; return; }
+        const occupied = [...memberRows.querySelectorAll('input')].filter(field => field.value.trim()).length;
+        if (occupied + names.length > 100) { feedback.textContent = 'Jumlah daftar melebihi 100 anggota. Bagi daftar menjadi beberapa penyimpanan; baris yang sudah diisi tetap tersedia.'; return; }
+        if (names.some(name => [...name].length > 255)) { feedback.textContent = 'Ada nama yang melebihi 255 karakter. Perbaiki daftar terlebih dahulu.'; return; }
+        [...memberRows.children].filter(row => !row.querySelector('input').value.trim()).forEach(row => row.remove());
+        names.forEach(name => appendName(name)); refresh(); textarea.value = ''; feedback.textContent = `${names.length} nama ditambahkan. Periksa daftar di bawah, lalu simpan semua anggota.`;
+    });
+    bulkMembers.addEventListener('submit', () => { saveButton.disabled = true; saveButton.textContent = 'Menyimpan anggota…'; });
+    window.addEventListener('pageshow', () => { saveButton.disabled = false; saveButton.textContent = 'Simpan semua anggota'; });
+    refresh();
+}

@@ -20,6 +20,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', EnsureAdmin::class])
     Route::post('/kelompok', [AdminController::class, 'saveGroup'])->name('groups.store');
     Route::put('/kelompok/{group}', [AdminController::class, 'saveGroup'])->name('groups.update');
     Route::get('/anggota', [AdminController::class, 'members'])->name('members');
+    Route::post('/anggota/banyak', [AdminController::class, 'storeMembers'])->name('members.bulk');
     Route::post('/anggota', [AdminController::class, 'saveMember'])->name('members.store');
     Route::put('/anggota/{member}', [AdminController::class, 'saveMember'])->name('members.update');
     Route::get('/transaksi/{kind}', [TransactionController::class, 'form'])->name('transactions.create');

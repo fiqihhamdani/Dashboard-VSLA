@@ -67,7 +67,7 @@ php artisan serve --no-reload --host=127.0.0.1 --port=8000
 Migrasi hanya membuat tabel, foreign key, indeks, dan kolom admin. Seeder bawaan sengaja tidak menambahkan akun ataupun data operasional. Urutan pengisian:
 
 1. **Kelompok:** tambah nama, kode unik, lokasi, dan status.
-2. **Anggota:** pilih kelompok, isi nama, dan status aktif/nonaktif. Nama yang sama dibedakan dengan kelompok serta nomor anggota pada pilihan transaksi.
+2. **Anggota:** pilih kelompok dan status sekali, lalu tambah beberapa baris nama atau tempel satu kolom nama dari Excel (satu nama per baris). Periksa daftar, lalu klik **Simpan semua anggota**. Maksimal 100 anggota per penyimpanan; jika satu baris tidak valid, tidak ada anggota yang disimpan. Anggota yang sudah ada tetap dapat diedit satu per satu. Nama yang sama dibedakan dengan kelompok serta nomor anggota pada pilihan transaksi.
 3. **Transaksi:** pilih kelompok, lalu simpanan, pencairan pinjaman, pembayaran angsuran, atau kas lainnya.
 4. **Pinjaman & tagihan:** lihat jadwal, sisa cicilan, status lunas, dan riwayat pembayaran.
 5. **Buku kas & laporan:** pilih kelompok/periode dan unduh `.xlsx` yang berisi Ringkasan, Rekap Bulanan, dan Buku Kas.
@@ -145,7 +145,7 @@ npm run build
 vendor/bin/pint --dirty --format agent
 ```
 
-Validasi pada workspace: PHP 8.3.36 dan 8.4, Node 24, MySQL 8.4; seluruh 22 tes (261 assertion) lulus pada kedua versi PHP; pengujian browser Chromium juga dijalankan pada database `vsla_browser_test` untuk alur formulir, preview, unduhan XLSX, grafik publik, dan lebar ponsel. Data contoh browser hanya berada di database tersebut.
+Validasi pada workspace: PHP 8.3.36 dan 8.4, Node 24, MySQL 8.4; seluruh 29 tes (297 assertion) lulus pada kedua versi PHP; pengujian browser Chromium juga dijalankan pada database `vsla_browser_test` untuk alur formulir, preview, unduhan XLSX, grafik publik, dan lebar ponsel. Data contoh browser hanya berada di database tersebut.
 
 ## Batas tahap ini
 
