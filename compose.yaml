@@ -1,0 +1,19 @@
+services:
+  db:
+    image: mysql:8.4
+    ports:
+      - "127.0.0.1:${DB_PORT:-3306}:3306"
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-vsla}
+      MYSQL_USER: ${DB_USERNAME:-vsla}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-vsla_local}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-vsla_local_root}
+    volumes:
+      - vsla_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+volumes:
+  vsla_mysql:
