@@ -4,7 +4,9 @@ Aplikasi Laravel 13 dan MySQL untuk pencatatan manual VSLA. Antarmuka berbahasa 
 
 ## Menjalankan di VS Code
 
-Prasyarat: PHP **8.4+ 64-bit**, Composer 2, Node.js **22.12+** (disarankan 24), npm, dan MySQL **8.4**. Aktifkan ekstensi PHP `pdo_mysql`, `mbstring`, `xml`, `dom`, `fileinfo`, `curl`, `zip`, `tokenizer`, dan `openssl`. Docker Compose opsional untuk menyediakan MySQL.
+Prasyarat: PHP **8.3.4+ 64-bit**, Composer 2, Node.js **22.12+** (disarankan 24), npm, dan MySQL **8.4**. Aktifkan ekstensi PHP `pdo_mysql`, `mbstring`, `xml`, `dom`, `fileinfo`, `curl`, `zip`, `tokenizer`, dan `openssl`. Docker Compose opsional untuk menyediakan MySQL.
+
+Dependensi Composer dikunci dengan target PHP 8.3.4 agar cocok dengan Laragon PHP 8.3. PHP 8.4+ juga didukung.
 
 Buka folder proyek di VS Code, lalu jalankan di terminal:
 
@@ -143,7 +145,7 @@ npm run build
 vendor/bin/pint --dirty --format agent
 ```
 
-Validasi pada workspace: PHP 8.4, Node 24, MySQL 8.4; pengujian browser Chromium juga dijalankan pada database `vsla_browser_test` untuk alur formulir, preview, unduhan XLSX, grafik publik, dan lebar ponsel. Data contoh browser hanya berada di database tersebut.
+Validasi pada workspace: PHP 8.3.36 dan 8.4, Node 24, MySQL 8.4; seluruh 22 tes (261 assertion) lulus pada kedua versi PHP; pengujian browser Chromium juga dijalankan pada database `vsla_browser_test` untuk alur formulir, preview, unduhan XLSX, grafik publik, dan lebar ponsel. Data contoh browser hanya berada di database tersebut.
 
 ## Batas tahap ini
 
