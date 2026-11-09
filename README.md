@@ -74,6 +74,13 @@ Migrasi hanya membuat tabel, foreign key, indeks, dan kolom admin. Seeder bawaan
 
 Tidak tersedia penghapusan transaksi keuangan. Anggota dengan riwayat tidak boleh dipindahkan ke kelompok lain. Nonaktifkan anggota untuk mempertahankan seluruh relasi; pembayaran tagihan lama tetap diizinkan untuk anggota/kelompok nonaktif. Migrasi bersifat tambahan terhadap tabel pengguna yang ada. Pada database berisi data, cadangkan dahulu lalu jalankan `php artisan migrate`; **jangan gunakan `migrate:fresh`, `db:wipe`, atau menghapus volume**.
 
+## Navigasi dan tampilan interaktif
+
+- Dashboard memakai kartu ringkasan, filter periode cepat (Bulan ini, 3 bulan, Tahun ini), dan grafik garis interaktif. Pilihan periode cepat tetap mempertahankan kelompok yang dipilih.
+- Klik legenda grafik untuk menampilkan/menyembunyikan garis. Pilih titik dengan mouse, sentuhan, atau Tab dan Enter untuk membaca nilai rupiah. Tombol Grafik/Tabel menampilkan data bulanan yang sama dalam dua bentuk.
+- Di ruang admin, tekan **Ctrl+K** (atau Cmd+K) untuk mencari menu. Sidebar dapat diringkas di komputer; pada ponsel, buka lewat tombol navigasi dan tutup dengan mengetuk area di luar atau tombol Escape.
+- Tombol mata pada login menampilkan/menyembunyikan kata sandi. Pemberitahuan keberhasilan bisa ditutup. Animasi mengikuti preferensi pengurangan gerakan pada perangkat.
+
 ## Aturan hitung dan integritas
 
 - Semua uang disimpan sebagai integer rupiah. Bunga bulanan disimpan sebagai basis poin (`1,25%` = 125), bukan floating point. Formulir menerima titik sebagai pemisah desimal bunga, misalnya `1.25`.
