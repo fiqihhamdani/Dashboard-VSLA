@@ -23,7 +23,9 @@ class TransactionController extends Controller
         $request->validate(['group_id' => 'nullable|integer|exists:groups,id', 'member_id' => 'nullable|integer|exists:members,id']);
         $groupId = $request->old('group_id', $request->input('group_id'));
         $memberId = $request->old('member_id', $request->input('member_id'));
-        $members = Member::with('group')->where('group_id', $groupId)->when($kind !== 'payment', fn ($q) => $q->where('is_active', true))->orderBy('name')->orderBy('id')->get();
+        $members = Member::with('group')->where('group_id', $groupId)
+            ->when($kind === 'payment', fn ($q) => $q->whereHas('loans'), fn ($q) => $q->where('is_active', true))
+            ->orderBy('name')->orderBy('id')->get();
         $bills = Installment::with(['loan', 'payments'])->whereHas('loan', fn ($q) => $q->where('member_id', $memberId)->whereHas('member', fn ($m) => $m->where('group_id', $groupId)))->orderBy('due_date')->orderBy('id')->get()->filter(fn ($b) => $b->amount > $b->payments->sum('amount'));
 
         return view('admin.transaction', compact('kind', 'groupId', 'memberId', 'members', 'bills') + ['groups' => Group::orderBy('name')->get(), 'requestKey' => $request->old('request_key', (string) Str::uuid())]);
