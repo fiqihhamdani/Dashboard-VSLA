@@ -11,7 +11,7 @@ const makeSvg = (tag, attributes = {}, text = '') => {
 const monthly = JSON.parse(document.getElementById('monthly-data')?.textContent || '[]');
 for (const container of document.querySelectorAll('.trend-chart')) {
     const series = Object.entries(JSON.parse(container.dataset.series));
-    const colors = container.dataset.chartId === 'balance' ? ['#2d6941'] : ['#2d6941', '#b07837', '#567b95'];
+    const colors = container.dataset.chartId === 'balance' ? ['#bf431b'] : ['#bf431b', '#456b89', '#34815a'];
     const hidden = new Set();
     let selected = Math.max(0, monthly.length - 1);
     let crosshair;
@@ -46,14 +46,14 @@ for (const container of document.querySelectorAll('.trend-chart')) {
         const min = Math.floor(low / step) * step; const max = Math.ceil(high / step) * step;
         const y = value => 198 - (value - min) / (max - min) * 172;
         for (let value = min; value <= max; value += step) {
-            svg.append(makeSvg('line', { x1: 52, x2: width - 15, y1: y(value), y2: y(value), stroke: '#e8ece3', 'stroke-dasharray': '3 5' }));
+            svg.append(makeSvg('line', { x1: 52, x2: width - 15, y1: y(value), y2: y(value), stroke: '#e9edf0', 'stroke-dasharray': '3 5' }));
             const label = new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
-            svg.append(makeSvg('text', { x: 43, y: y(value) + 3, 'text-anchor': 'end', fill: '#667260', 'font-size': 10 }, label));
+            svg.append(makeSvg('text', { x: 43, y: y(value) + 3, 'text-anchor': 'end', fill: '#606e7b', 'font-size': 10 }, label));
         }
         monthly.forEach((row, i) => {
-            if ((i % Math.ceil(monthly.length / Math.max(2, Math.floor(width / 95))) === 0 && (i === 0 || x(monthly.length - 1) - x(i) > 65)) || i === monthly.length - 1) svg.append(makeSvg('text', { x: x(i), y: 223, 'text-anchor': 'middle', fill: '#667260', 'font-size': 10 }, row.label));
+            if ((i % Math.ceil(monthly.length / Math.max(2, Math.floor(width / 95))) === 0 && (i === 0 || x(monthly.length - 1) - x(i) > 65)) || i === monthly.length - 1) svg.append(makeSvg('text', { x: x(i), y: 223, 'text-anchor': 'middle', fill: '#606e7b', 'font-size': 10 }, row.label));
         });
-        crosshair = makeSvg('line', { x1: x(selected), x2: x(selected), y1: 22, y2: 201, stroke: '#b9d4bd', 'stroke-dasharray': '4 4', 'stroke-width': 1 }); svg.append(crosshair);
+        crosshair = makeSvg('line', { x1: x(selected), x2: x(selected), y1: 22, y2: 201, stroke: '#f4b89f', 'stroke-dasharray': '4 4', 'stroke-width': 1 }); svg.append(crosshair);
         series.forEach(([key, label], color) => {
             if (hidden.has(key)) return;
             const path = monthly.map((row, i) => `${i ? 'L' : 'M'}${x(i)},${y(row[key])}`).join(' ');
@@ -267,4 +267,16 @@ if (activity) {
         activity.querySelector('[data-activity-count]').textContent = `${visible} dari ${items.length} transaksi`;
         activity.querySelector('[data-activity-empty]').hidden = visible > 0;
     }));
+}
+
+const recordMenu = document.querySelector('[data-record-menu]');
+if (recordMenu) {
+    document.addEventListener('pointerdown', event => {
+        if (!recordMenu.contains(event.target)) recordMenu.open = false;
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && recordMenu.open) {
+            event.preventDefault(); recordMenu.open = false; recordMenu.querySelector('summary').focus();
+        }
+    });
 }
