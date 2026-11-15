@@ -1,3 +1,5 @@
+import './admin-transactions';
+import './deposit-details';
 const rupiah = value => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value);
 const namespace = 'http://www.w3.org/2000/svg';
 const makeSvg = (tag, attributes = {}, text = '') => {
@@ -98,28 +100,7 @@ for (const container of document.querySelectorAll('[data-sparkline]')) {
     const points = values.map((value, i) => `${i ? 'L' : 'M'}${2 + i * 78 / Math.max(1, values.length - 1)},${max === min ? 16 : 28 - (value - min) / (max - min) * 24}`).join(' ');
     svg.append(makeSvg('path', { d: points, fill: 'none', stroke: container.dataset.featured === 'true' ? '#c7d2fe' : '#a5b4fc', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })); container.append(svg);
 }
-const context = document.querySelector('[data-context-form]');
-context?.querySelector('[name=group_id]')?.addEventListener('change', () => {
-    const member = context.querySelector('[name=member_id]'); if (member) member.value = ''; context.requestSubmit();
-});
-context?.querySelector('[name=member_id]')?.addEventListener('change', () => context.requestSubmit());
 const transaction = document.querySelector('[data-transaction-form]');
-const rows = document.getElementById('saving-rows');
-if (rows) {
-    let next = Math.max(...[...rows.querySelectorAll('select')].map(el => Number(el.name.match(/\[(\d+)\]/)[1]))) + 1;
-    const updateTotal = () => { document.getElementById('saving-total').textContent = rupiah([...rows.querySelectorAll('input')].reduce((sum, input) => sum + Number(input.value || 0), 0)); };
-    rows.addEventListener('input', updateTotal);
-    rows.addEventListener('click', event => {
-        if (event.target.closest('[data-remove-row]') && rows.children.length > 1) { event.target.closest('[data-saving-row]').remove(); updateTotal(); }
-    });
-    document.getElementById('add-saving-row').addEventListener('click', () => {
-        if (rows.children.length >= 100) return;
-        const copy = rows.firstElementChild.cloneNode(true);
-        for (const field of copy.querySelectorAll('input,select')) { field.name = field.name.replace(/\[\d+\]/, `[${next}]`); field.value = ''; }
-        next++; rows.append(copy); copy.querySelector('select').focus(); updateTotal();
-    });
-    updateTotal();
-}
 if (transaction?.dataset.kind === 'loan') {
     const preview = document.getElementById('loan-preview');
     const update = () => {

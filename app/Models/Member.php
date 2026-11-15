@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,5 +32,12 @@ class Member extends Model
     public function loans(): HasMany
     {
         return $this->hasMany(Loan::class);
+    }
+
+    public function scopeForTransaction(Builder $query, string $kind): Builder
+    {
+        return $kind === 'payment'
+            ? $query->whereHas('loans.installments', fn ($bills) => $bills->open())
+            : $query->where('is_active', true);
     }
 }

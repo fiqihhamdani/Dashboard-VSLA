@@ -40,11 +40,20 @@ class AdminController extends Controller
         return redirect()->route('admin.groups')->with('status', 'Data kelompok berhasil disimpan.');
     }
 
-    public function members(Request $request): View
+    public function members(Request $request): View|RedirectResponse
     {
-        $q = $request->validate(['q' => 'nullable|string|max:100', 'group_id' => 'nullable|integer|exists:groups,id']);
+        $q = $request->validate(['q' => 'nullable|string|max:100', 'group_id' => 'nullable|integer|exists:groups,id', 'is_active' => 'nullable|boolean']);
 
-        return view('admin.members', ['members' => Member::with('group')->when($q['q'] ?? null, fn ($query, $s) => $query->where('name', 'like', "%$s%"))->when($q['group_id'] ?? null, fn ($query, $id) => $query->where('group_id', $id))->orderBy('name')->orderBy('id')->paginate(20)->withQueryString(), 'groups' => Group::orderBy('name')->get(), 'editing' => $request->filled('edit') ? Member::findOrFail($request->integer('edit')) : null]);
+        if ($request->filled('edit')) {
+            return redirect()->route('admin.members.edit', $request->integer('edit'));
+        }
+
+        return view('admin.members', ['members' => Member::with('group')->when($q['q'] ?? null, fn ($query, $s) => $query->where('name', 'like', "%$s%"))->when($q['group_id'] ?? null, fn ($query, $id) => $query->where('group_id', $id))->when(isset($q['is_active']), fn ($query) => $query->where('is_active', $q['is_active']))->orderBy('name')->orderBy('id')->paginate(20)->withQueryString(), 'groups' => Group::orderBy('name')->get()]);
+    }
+
+    public function memberForm(?Member $member = null): View
+    {
+        return view('admin.member-form', ['groups' => Group::orderBy('name')->get(), 'editing' => $member]);
     }
 
     public function loans(Request $request): View

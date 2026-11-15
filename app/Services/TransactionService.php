@@ -72,7 +72,9 @@ class TransactionService
                         $this->fail('date', 'Tanggal pembayaran tidak boleh sebelum tanggal pencairan.');
                     }
                     $amount = (int) $data['amount'];
-                    if ($amount > $bill->remaining()) {
+                    // A locking read sees payments committed while this transaction waited for the bill lock.
+                    $paid = (int) $bill->payments()->lockForUpdate()->get()->sum('amount');
+                    if ($amount > $bill->amount - $paid) {
                         $this->fail('amount', 'Pembayaran melebihi sisa tagihan. Periksa nominal yang masih terbuka.');
                     }
                     $description = 'Pembayaran angsuran ke-'.$bill->sequence;

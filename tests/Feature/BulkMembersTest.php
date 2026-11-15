@@ -35,7 +35,7 @@ class BulkMembersTest extends TestCase
         $this->actingAs(User::factory()->admin()->create());
         $data = ['group_id' => $group->id, 'is_active' => 1, 'members' => [['name' => 'Nama valid'], ['name' => '   ']]];
 
-        $this->followingRedirects()->from(route('admin.members'))->post(route('admin.members.bulk'), $data)
+        $this->followingRedirects()->from(route('admin.members.create'))->post(route('admin.members.bulk'), $data)
             ->assertOk()
             ->assertSee('Nama valid')
             ->assertSee('Nama anggota pada baris 2 wajib diisi.');

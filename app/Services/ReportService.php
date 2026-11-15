@@ -64,12 +64,12 @@ class ReportService
     {
         $balance = $this->balance($this->cash($filter)->where('date', '<', $filter['start']));
 
-        return $this->cash($filter)->with('group')->whereBetween('date', [$filter['start'], $filter['end']])->orderBy('date')->orderBy('id')->get()->map(function ($cash) use (&$balance) {
+        return $this->cash($filter)->with('group')->withCount('savings')->whereBetween('date', [$filter['start'], $filter['end']])->orderBy('date')->orderBy('id')->get()->map(function ($cash) use (&$balance) {
             $in = $cash->direction === 'in' ? $cash->amount : 0;
             $out = $cash->direction === 'out' ? $cash->amount : 0;
             $balance += $in - $out;
 
-            return ['date' => $cash->date->toDateString(), 'group' => $cash->group->name, 'description' => $cash->description, 'in' => $in, 'out' => $out, 'balance' => $balance];
+            return ['date' => $cash->date->toDateString(), 'group' => $cash->group->name, 'description' => $cash->description, 'in' => $in, 'out' => $out, 'balance' => $balance, 'cash_id' => $cash->id, 'savings_count' => $cash->savings_count];
         });
     }
 }

@@ -21,7 +21,7 @@ class ExcelReport
         }
         $cash = [['Tanggal', 'Kelompok', 'Uraian', 'Kas masuk', 'Kas keluar', 'Saldo'], ['Saldo awal', '', '', 0, 0, $dashboard['summary']['opening']]];
         foreach ($ledger as $row) {
-            $cash[] = array_values($row);
+            $cash[] = [$row['date'], $row['group'], $row['description'], $row['in'], $row['out'], $row['balance']];
         }
         $path = tempnam(storage_path('app/private'), 'vsla-');
         $zip = new ZipArchive;

@@ -10,7 +10,7 @@
     <a href="{{ route('admin.index') }}" class="sidebar-brand"><span class="brand-symbol"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 5 9 15L21 5M7 5l5 8 5-8"/></svg></span><span class="sidebar-copy"><strong>VSLA<span class="text-indigo-300">.</span></strong><small>Ruang pengurus</small></span></a>
     <div class="sidebar-section-label">RUANG KERJA</div>
     <nav class="sidebar-nav" aria-label="Navigasi admin">
-        @foreach([['admin.index','Ringkasan','home'],['admin.groups','Kelompok','groups'],['admin.members','Anggota','users'],['admin.loans','Pinjaman & tagihan','loan'],['admin.ledger','Buku kas & laporan','receipt']] as [$route,$label,$icon])
+        @foreach([['admin.index','Ringkasan','home'],['admin.groups','Kelompok','groups'],['admin.members','Daftar Anggota','users'],['admin.members.create','Tambah Anggota','users'],['admin.loans','Pinjaman & tagihan','loan'],['admin.ledger','Buku kas & laporan','receipt']] as [$route,$label,$icon])
         <a href="{{ route($route) }}" class="sidebar-link {{ request()->routeIs($route) ? 'is-active' : '' }}" @if(request()->routeIs($route)) aria-current="page" @endif title="{{ $label }}"><x-icon :name="$icon"/><span class="sidebar-copy">{{ $label }}</span>@if(request()->routeIs($route))<span class="nav-dot sidebar-copy"></span>@endif</a>
         @endforeach
         <div class="sidebar-section-label">CATAT TRANSAKSI</div>

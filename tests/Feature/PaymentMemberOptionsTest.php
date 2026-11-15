@@ -32,13 +32,14 @@ class PaymentMemberOptionsTest extends TestCase
 
         $this->get(route('admin.transactions.create', ['kind' => 'payment', 'group_id' => $group->id]))
             ->assertOk()
-            ->assertViewHas('members', fn ($members) => $members->modelKeys() === [$borrower->id])
-            ->assertSee($borrower->name)->assertDontSee($withoutLoan->name)->assertDontSee($otherBorrower->name);
+            ->assertViewHas('members', fn ($members) => $members->modelKeys() === [$borrower->id]);
+        $this->getJson(route('admin.members.search', ['kind' => 'payment', 'group_id' => $group->id]))
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $borrower->id);
         $this->get(route('admin.transactions.create', ['kind' => 'payment', 'group_id' => $otherGroup->id]))
             ->assertOk()->assertViewHas('members', fn ($members) => $members->modelKeys() === [$otherBorrower->id]);
     }
 
-    public function test_empty_borrower_list_explains_that_the_group_has_no_loan_records(): void
+    public function test_empty_borrower_list_explains_that_all_bills_are_settled(): void
     {
         $group = Group::factory()->create();
         Member::factory()->for($group)->create();
@@ -46,7 +47,7 @@ class PaymentMemberOptionsTest extends TestCase
 
         $this->get(route('admin.transactions.create', ['kind' => 'payment', 'group_id' => $group->id]))
             ->assertOk()->assertViewHas('members', fn ($members) => $members->isEmpty())
-            ->assertSee('Belum ada anggota yang memiliki catatan pinjaman di kelompok ini.')
+            ->assertSee('Semua tagihan sudah lunas.')
             ->assertDontSee('Tambahkan anggota.');
         $this->get(route('admin.transactions.create', ['kind' => 'payment']))
             ->assertOk()->assertViewHas('members', fn ($members) => $members->isEmpty());
@@ -68,7 +69,7 @@ class PaymentMemberOptionsTest extends TestCase
             'kind' => 'payment', 'request_key' => (string) Str::uuid(), 'group_id' => $group->id,
             'date' => '2026-10-10', 'member_id' => $member->id, 'installment_id' => $bill->id, 'amount' => 100000,
         ])->assertRedirect()->assertSessionHasNoErrors();
-        $this->get($url)->assertOk()->assertViewHas('members', fn ($members) => $members->modelKeys() === [$member->id])
+        $this->get($url)->assertOk()->assertViewHas('members', fn ($members) => $members->isEmpty())
             ->assertViewHas('bills', fn ($bills) => $bills->isEmpty())->assertSee('Tidak ada tagihan terbuka untuk anggota ini.');
     }
 

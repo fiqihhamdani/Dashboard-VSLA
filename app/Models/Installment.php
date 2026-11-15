@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,5 +32,12 @@ class Installment extends Model
     public function remaining(): int
     {
         return $this->amount - (int) $this->payments()->sum('amount');
+    }
+
+    public function scopeOpen(Builder $query): Builder
+    {
+        return $query->where('installments.amount', '>', Payment::query()
+            ->selectRaw('COALESCE(SUM(payments.amount), 0)')
+            ->whereColumn('payments.installment_id', 'installments.id'));
     }
 }
