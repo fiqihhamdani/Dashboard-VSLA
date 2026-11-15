@@ -1,5 +1,5 @@
 @props(['name', 'id', 'kind', 'groupId' => null, 'selected' => null, 'error' => null, 'label' => 'Nama anggota', 'required' => true])
-<div class="relative min-w-0" data-member-search data-endpoint="{{ route('admin.members.search') }}" data-kind="{{ $kind }}" data-group="{{ $groupId }}">
+<div {{ $attributes->class(['relative min-w-0']) }} data-member-search data-endpoint="{{ route('admin.members.search') }}" data-kind="{{ $kind }}" data-group="{{ $groupId }}">
     <label for="{{ $id }}-search">{{ $label }}</label>
     <input type="hidden" name="{{ $name }}" value="{{ $selected?->id }}" data-member-value>
     <input id="{{ $id }}-search" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="{{ $id }}-list" aria-describedby="{{ $id }}-status{{ $error ? ' '.$id.'-error' : '' }}" autocomplete="off" maxlength="100" placeholder="{{ $groupId ? 'Ketik sebagian nama anggota…' : 'Pilih kelompok terlebih dahulu' }}" value="{{ $selected ? $selected->name.' · '.$selected->group->name.' · '.$selected->group->code.' · #'.$selected->id : '' }}" @disabled(!$groupId) @required($required) @if($error) aria-invalid="true" @endif data-member-input>
