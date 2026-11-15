@@ -20,7 +20,7 @@ export function initMemberSearch(root) {
         active = index;
         buttons.forEach((button, i) => {
             button.setAttribute('aria-selected', String(i === index));
-            button.classList.toggle('bg-brand-50', i === index);
+            button.classList.toggle('bg-indigo-50', i === index);
         });
         if (buttons[index]) { input.setAttribute('aria-activedescendant', buttons[index].id); buttons[index].scrollIntoView({ block: 'nearest' }); }
     };
@@ -31,7 +31,7 @@ export function initMemberSearch(root) {
             const button = document.createElement('button');
             button.type = 'button'; button.role = 'option'; button.tabIndex = -1;
             button.id = `${results.id}-option-${member.id}`;
-            button.className = 'block min-h-11 w-full rounded-lg px-3 py-3 text-left text-sm hover:bg-brand-50';
+            button.className = 'block min-h-11 w-full rounded-lg px-3 py-3 text-left text-sm hover:bg-indigo-50';
             button.textContent = member.label; button.setAttribute('aria-selected', 'false');
             button.addEventListener('mousedown', event => event.preventDefault());
             button.addEventListener('click', () => {
