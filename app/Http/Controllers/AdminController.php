@@ -7,6 +7,7 @@ use App\Models\CashEntry;
 use App\Models\Group;
 use App\Models\Loan;
 use App\Models\Member;
+use App\Services\ReportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,9 +17,13 @@ use Illuminate\View\View;
 
 class AdminController extends Controller
 {
-    public function index(): View
+    public function index(ReportService $reports): View
     {
-        return view('admin.index', ['groupCount' => Group::count(), 'memberCount' => Member::count(), 'cashCount' => CashEntry::count()]);
+        return view('admin.index', [
+            'groupCount' => Group::count(), 'memberCount' => Member::count(), 'cashCount' => CashEntry::count(),
+            'report' => $reports->dashboard(['start' => now()->startOfMonth()->toDateString(), 'end' => now()->toDateString()]),
+            'recentTransactions' => CashEntry::with('group')->orderByDesc('date')->orderByDesc('id')->limit(6)->get(),
+        ]);
     }
 
     public function groups(Request $request): View

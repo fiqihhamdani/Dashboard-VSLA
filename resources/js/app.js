@@ -11,7 +11,7 @@ const makeSvg = (tag, attributes = {}, text = '') => {
 const monthly = JSON.parse(document.getElementById('monthly-data')?.textContent || '[]');
 for (const container of document.querySelectorAll('.trend-chart')) {
     const series = Object.entries(JSON.parse(container.dataset.series));
-    const colors = container.dataset.chartId === 'balance' ? ['#14b8a6'] : ['#6366f1', '#f59e0b', '#14b8a6'];
+    const colors = container.dataset.chartId === 'balance' ? ['#2d6941'] : ['#2d6941', '#b07837', '#567b95'];
     const hidden = new Set();
     let selected = Math.max(0, monthly.length - 1);
     let crosshair;
@@ -46,14 +46,14 @@ for (const container of document.querySelectorAll('.trend-chart')) {
         const min = Math.floor(low / step) * step; const max = Math.ceil(high / step) * step;
         const y = value => 198 - (value - min) / (max - min) * 172;
         for (let value = min; value <= max; value += step) {
-            svg.append(makeSvg('line', { x1: 52, x2: width - 15, y1: y(value), y2: y(value), stroke: '#edf0f6', 'stroke-dasharray': '3 5' }));
+            svg.append(makeSvg('line', { x1: 52, x2: width - 15, y1: y(value), y2: y(value), stroke: '#e8ece3', 'stroke-dasharray': '3 5' }));
             const label = new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
-            svg.append(makeSvg('text', { x: 43, y: y(value) + 3, 'text-anchor': 'end', fill: '#64748b', 'font-size': 10 }, label));
+            svg.append(makeSvg('text', { x: 43, y: y(value) + 3, 'text-anchor': 'end', fill: '#667260', 'font-size': 10 }, label));
         }
         monthly.forEach((row, i) => {
-            if ((i % Math.ceil(monthly.length / Math.max(2, Math.floor(width / 95))) === 0 && (i === 0 || x(monthly.length - 1) - x(i) > 65)) || i === monthly.length - 1) svg.append(makeSvg('text', { x: x(i), y: 223, 'text-anchor': 'middle', fill: '#64748b', 'font-size': 10 }, row.label));
+            if ((i % Math.ceil(monthly.length / Math.max(2, Math.floor(width / 95))) === 0 && (i === 0 || x(monthly.length - 1) - x(i) > 65)) || i === monthly.length - 1) svg.append(makeSvg('text', { x: x(i), y: 223, 'text-anchor': 'middle', fill: '#667260', 'font-size': 10 }, row.label));
         });
-        crosshair = makeSvg('line', { x1: x(selected), x2: x(selected), y1: 22, y2: 201, stroke: '#c7d2fe', 'stroke-dasharray': '4 4', 'stroke-width': 1 }); svg.append(crosshair);
+        crosshair = makeSvg('line', { x1: x(selected), x2: x(selected), y1: 22, y2: 201, stroke: '#b9d4bd', 'stroke-dasharray': '4 4', 'stroke-width': 1 }); svg.append(crosshair);
         series.forEach(([key, label], color) => {
             if (hidden.has(key)) return;
             const path = monthly.map((row, i) => `${i ? 'L' : 'M'}${x(i)},${y(row[key])}`).join(' ');
@@ -93,12 +93,6 @@ for (const container of document.querySelectorAll('.trend-chart')) {
             card.querySelector('.chart-help').hidden = isTable; if (!isTable) draw();
         });
     }
-}
-for (const container of document.querySelectorAll('[data-sparkline]')) {
-    const values = monthly.map(row => row[container.dataset.sparkline]); if (!values.length) continue;
-    const min = Math.min(...values); const max = Math.max(...values); const svg = makeSvg('svg', { width: 82, height: 32, viewBox: '0 0 82 32' });
-    const points = values.map((value, i) => `${i ? 'L' : 'M'}${2 + i * 78 / Math.max(1, values.length - 1)},${max === min ? 16 : 28 - (value - min) / (max - min) * 24}`).join(' ');
-    svg.append(makeSvg('path', { d: points, fill: 'none', stroke: container.dataset.featured === 'true' ? '#c7d2fe' : '#a5b4fc', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })); container.append(svg);
 }
 const transaction = document.querySelector('[data-transaction-form]');
 if (transaction?.dataset.kind === 'loan') {
@@ -215,6 +209,15 @@ if (menuDialog) {
     const links = [...document.querySelectorAll('.sidebar-nav a,.sidebar-bottom a')].map(link => {
         const item = document.createElement('a'); item.href = link.href; item.className = 'quick-menu-link'; item.append(link.querySelector('svg').cloneNode(true), document.createTextNode(link.querySelector('.sidebar-copy').textContent)); results.append(item); return item;
     });
+    results.addEventListener('keydown', event => {
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+        const visible = links.filter(link => !link.hidden);
+        const current = visible.indexOf(document.activeElement);
+        if (current < 0 || !visible.length) return;
+        event.preventDefault();
+        const target = event.key === 'Home' ? 0 : event.key === 'End' ? visible.length - 1 : (current + (event.key === 'ArrowDown' ? 1 : -1) + visible.length) % visible.length;
+        visible[target].focus();
+    });
     const filterMenu = () => { const query = search.value.trim().toLocaleLowerCase('id'); links.forEach(link => { link.hidden = !link.textContent.toLocaleLowerCase('id').includes(query); }); menuDialog.querySelector('[data-menu-empty]').hidden = links.some(link => !link.hidden); };
     const openMenu = () => { if (menuDialog.open) return; search.value = ''; filterMenu(); menuDialog.showModal(); search.focus(); };
     trigger.addEventListener('click', openMenu); menuDialog.querySelector('[data-close-quick-menu]').addEventListener('click', () => menuDialog.close()); search.addEventListener('input', filterMenu);
@@ -235,4 +238,33 @@ for (const form of document.querySelectorAll('[data-report-filter]')) {
     form.addEventListener('change', updatePresets);
     form.addEventListener('submit', () => { const button = form.querySelector('[data-apply-filter]'); button.disabled = true; button.querySelector('span').textContent = 'Memuat laporan…'; });
     window.addEventListener('pageshow', () => { const button = form.querySelector('[data-apply-filter]'); button.disabled = false; button.querySelector('span').textContent = 'Terapkan filter'; }); updatePresets();
+}
+
+const densityToggle = document.querySelector('[data-density-toggle]');
+if (densityToggle) {
+    let compact = false;
+    try { compact = localStorage.getItem('vsla-density') === 'compact'; } catch {}
+    const setDensity = () => {
+        document.body.classList.toggle('density-compact', compact);
+        densityToggle.setAttribute('aria-pressed', String(compact));
+        densityToggle.title = compact ? 'Gunakan tampilan tabel lapang' : 'Gunakan tampilan tabel ringkas';
+    };
+    setDensity();
+    densityToggle.addEventListener('click', () => {
+        compact = !compact; setDensity();
+        document.querySelector('[data-density-feedback]').textContent = compact ? 'Tampilan tabel ringkas diaktifkan.' : 'Tampilan tabel lapang diaktifkan.';
+        try { localStorage.setItem('vsla-density', compact ? 'compact' : 'comfortable'); } catch {}
+    });
+}
+const activity = document.querySelector('[data-recent-activity]');
+if (activity) {
+    const items = [...activity.querySelectorAll('[data-activity-direction]')];
+    activity.querySelectorAll('[data-activity-filter]').forEach(button => button.addEventListener('click', () => {
+        const filter = button.dataset.activityFilter;
+        activity.querySelectorAll('[data-activity-filter]').forEach(tab => tab.setAttribute('aria-pressed', String(tab === button)));
+        items.forEach(item => item.hidden = filter !== 'all' && item.dataset.activityDirection !== filter);
+        const visible = items.filter(item => !item.hidden).length;
+        activity.querySelector('[data-activity-count]').textContent = `${visible} dari ${items.length} transaksi`;
+        activity.querySelector('[data-activity-empty]').hidden = visible > 0;
+    }));
 }

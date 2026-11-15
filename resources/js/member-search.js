@@ -10,6 +10,9 @@ export function initMemberSearch(root) {
     let timer, controller, generation = 0, page = 1, options = [], active = -1, query = '';
     const excluded = () => new Set([...root.closest('form').querySelectorAll('[data-saving-row] [data-member-value]')].filter(el => el !== value).map(el => el.value).filter(Boolean));
     const close = () => { panel.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); active = -1; };
+    const positionPanel = () => { panel.style.top = `${input.offsetTop + input.offsetHeight}px`; };
+    const observer = new ResizeObserver(() => { if (!panel.hidden) positionPanel(); });
+    observer.observe(root);
     const invalidate = () => { clearTimeout(timer); controller?.abort(); generation++; root.removeAttribute('aria-busy'); };
     const validate = () => input.setCustomValidity(input.required && !value.value ? 'Pilih anggota dari hasil pencarian.' : '');
     const highlight = index => {
@@ -17,7 +20,7 @@ export function initMemberSearch(root) {
         active = index;
         buttons.forEach((button, i) => {
             button.setAttribute('aria-selected', String(i === index));
-            button.classList.toggle('bg-indigo-50', i === index);
+            button.classList.toggle('bg-emerald-50', i === index);
         });
         if (buttons[index]) { input.setAttribute('aria-activedescendant', buttons[index].id); buttons[index].scrollIntoView({ block: 'nearest' }); }
     };
@@ -28,7 +31,7 @@ export function initMemberSearch(root) {
             const button = document.createElement('button');
             button.type = 'button'; button.role = 'option'; button.tabIndex = -1;
             button.id = `${results.id}-option-${member.id}`;
-            button.className = 'block min-h-11 w-full rounded-lg px-3 py-3 text-left text-sm hover:bg-indigo-50';
+            button.className = 'block min-h-11 w-full rounded-lg px-3 py-3 text-left text-sm hover:bg-emerald-50';
             button.textContent = member.label; button.setAttribute('aria-selected', 'false');
             button.addEventListener('mousedown', event => event.preventDefault());
             button.addEventListener('click', () => {
@@ -47,7 +50,7 @@ export function initMemberSearch(root) {
         if (!root.dataset.group) return;
         controller?.abort(); controller = new AbortController(); const current = ++generation;
         root.setAttribute('aria-busy', 'true'); status.textContent = 'Memuat anggota…'; more.setAttribute('aria-disabled', 'true');
-        panel.hidden = false; input.setAttribute('aria-expanded', 'true');
+        panel.hidden = false; positionPanel(); input.setAttribute('aria-expanded', 'true');
         if (!append) { results.replaceChildren(); options = []; page = 1; active = -1; }
         const url = new URL(root.dataset.endpoint, location.origin);
         url.search = new URLSearchParams({ group_id: root.dataset.group, kind: root.dataset.kind, q: query, page });
@@ -91,7 +94,7 @@ export function initMemberSearch(root) {
             input.disabled = !group; input.placeholder = group ? 'Ketik sebagian nama anggota…' : 'Pilih kelompok terlebih dahulu';
             status.textContent = group ? 'Cari nama, lalu pilih anggota dari hasil pencarian.' : 'Pilih kelompok terlebih dahulu';
         },
-        destroy() { invalidate(); },
+        destroy() { invalidate(); observer.disconnect(); },
     };
     validate(); instances.set(root, api); return api;
 }
