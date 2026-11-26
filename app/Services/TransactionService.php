@@ -18,10 +18,15 @@ class TransactionService
 {
     public function store(User $admin, array $data): CashEntry
     {
-        return DB::transaction(function () use ($admin, $data) {
+        return $this->write($admin, $data);
+    }
+
+    private function write(User $admin, array $data, ?CashEntry $editing = null): CashEntry
+    {
+        return DB::transaction(function () use ($admin, $data, $editing) {
             User::query()->whereKey($admin->id)->lockForUpdate()->firstOrFail();
             $fingerprint = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
-            $previous = CashEntry::where('created_by', $admin->id)->where('request_key', $data['request_key'])->first();
+            $previous = $editing ? null : CashEntry::withTrashed()->where('created_by', $admin->id)->where('request_key', $data['request_key'])->first();
             if ($previous) {
                 if (! hash_equals($previous->fingerprint, $fingerprint)) {
                     $this->fail('request_key', 'Formulir ini sudah dipakai untuk data lain. Buka formulir baru.');
@@ -84,26 +89,185 @@ class TransactionService
                     $description = $data['description'];
                     break;
             }
-            $cash = CashEntry::create(['group_id' => $group->id, 'created_by' => $admin->id, 'request_key' => $data['request_key'], 'fingerprint' => $fingerprint, 'date' => $data['date'], 'direction' => $direction, 'category' => $data['kind'], 'amount' => $amount, 'description' => $description]);
+            $attributes = ['group_id' => $group->id, 'date' => $data['date'], 'direction' => $direction, 'category' => $data['kind'], 'amount' => $amount, 'description' => $description] + ($data['kind'] === 'loan' && array_key_exists('proof_url', $data) ? ['proof_url' => $data['proof_url']] : []);
+            if ($editing) {
+                $editing->update($attributes);
+                $cash = $editing;
+            } else {
+                $cash = CashEntry::create($attributes + ['created_by' => $admin->id, 'request_key' => $data['request_key'], 'fingerprint' => $fingerprint]);
+            }
             if ($data['kind'] === 'saving') {
                 foreach ($data['rows'] as $row) {
                     Saving::create(['cash_entry_id' => $cash->id, 'member_id' => $row['member_id'], 'type' => $data['type'], 'amount' => (int) $row['amount']]);
                 }
             }
             if ($data['kind'] === 'loan') {
-                $loan = Loan::create($loanDetails + ['member_id' => $data['member_id'], 'cash_entry_id' => $cash->id, 'disbursed_at' => $data['date']]);
+                $existing = $editing ? Loan::where('cash_entry_id', $cash->id)->firstOrFail() : null;
+                if ($existing && $existing->member_id !== (int) $data['member_id'] && Payment::whereHas('installment', fn ($q) => $q->where('loan_id', $existing->id))->exists()) {
+                    $this->fail('member_id', 'Pinjaman yang sudah dibayar tidak dapat dialihkan ke anggota lain.');
+                }
+                $loan = $existing ?? new Loan;
+                $loan->fill($loanDetails + ['member_id' => $data['member_id'], 'cash_entry_id' => $cash->id, 'disbursed_at' => $data['date']])->save();
                 $part = intdiv($loan->total, $loan->months);
                 $anchor = CarbonImmutable::parse($data['date']);
-                for ($i = 1; $i <= $loan->months; $i++) {
-                    $loan->installments()->create(['sequence' => $i, 'due_date' => $anchor->addMonthsNoOverflow($i)->toDateString(), 'amount' => $i === $loan->months ? $loan->total - $part * ($i - 1) : $part]);
+                foreach ($loan->installments()->with('payments')->lockForUpdate()->get() as $oldBill) {
+                    $newAmount = $oldBill->sequence === $loan->months ? $loan->total - $part * ($loan->months - 1) : $part;
+                    if ($oldBill->payments->isNotEmpty() && ($oldBill->sequence > $loan->months || $oldBill->payments->sum('amount') > $newAmount)) {
+                        $this->fail('principal', 'Perubahan menghapus cicilan yang sudah dibayar atau membuat tagihan lebih kecil daripada pembayarannya.');
+                    }
+                    if ($oldBill->payments->contains(fn ($payment) => $payment->paid_at->toDateString() < $data['date'])) {
+                        $this->fail('date', 'Tanggal pencairan baru tidak boleh setelah pembayaran yang sudah tercatat.');
+                    }
                 }
+                for ($i = 1; $i <= $loan->months; $i++) {
+                    $billData = ['due_date' => $anchor->addMonthsNoOverflow($i)->toDateString(), 'amount' => $i === $loan->months ? $loan->total - $part * ($i - 1) : $part];
+                    $scheduled = $loan->installments()->withTrashed()->firstOrNew(['sequence' => $i]);
+                    $scheduled->fill($billData);
+                    if ($scheduled->trashed()) {
+                        $scheduled->restore();
+                    } else {
+                        $scheduled->save();
+                    }
+                }
+                $loan->installments()->where('sequence', '>', $loan->months)->delete();
             }
             if ($data['kind'] === 'payment') {
-                Payment::create(['installment_id' => $bill->id, 'cash_entry_id' => $cash->id, 'paid_at' => $data['date'], 'amount' => $amount]);
+                $payment = $editing ? Payment::withTrashed()->where('cash_entry_id', $cash->id)->firstOrFail() : new Payment;
+                $payment->fill(['installment_id' => $bill->id, 'cash_entry_id' => $cash->id, 'paid_at' => $data['date'], 'amount' => $amount]);
+                if ($payment->trashed()) {
+                    $payment->restore();
+                } else {
+                    $payment->save();
+                }
             }
 
             return $cash;
         }, 3);
+    }
+
+    public function revise(User $admin, CashEntry $cash, array $data, string $reason, int $version): CashEntry
+    {
+        return DB::transaction(function () use ($admin, $cash, $data, $reason, $version): CashEntry {
+            $locked = $this->lockCorrection($admin, $cash, [(int) $data['group_id']]);
+            $this->checkVersion($locked, $version);
+            if ($data['kind'] !== $locked->category) {
+                $this->fail('kind', 'Jenis transaksi tidak dapat diubah.');
+            }
+            $before = $this->snapshot($locked);
+            $pairs = $locked->savings()->get(['member_id', 'type'])->toArray();
+            $locked->savings()->delete();
+            Payment::where('cash_entry_id', $locked->id)->delete();
+            $updated = $this->write($admin, $data, $locked);
+            $pairs = array_merge($pairs, $updated->savings()->get(['member_id', 'type'])->toArray());
+            $this->validateSavingHistory($pairs);
+            $updated->increment('version');
+            $this->audit($admin, $updated, 'edit', $reason, $before);
+
+            return $updated;
+        }, 3);
+    }
+
+    public function cancel(User $admin, CashEntry $cash, string $reason, int $version): CashEntry
+    {
+        return DB::transaction(function () use ($admin, $cash, $reason, $version): CashEntry {
+            $locked = $this->lockCorrection($admin, $cash);
+            if ($locked->trashed()) {
+                return $locked;
+            }
+            $this->checkVersion($locked, $version);
+            $before = $this->snapshot($locked);
+            $pairs = $locked->savings()->get(['member_id', 'type'])->toArray();
+            $loan = Loan::where('cash_entry_id', $locked->id)->lockForUpdate()->first();
+            if ($loan) {
+                if (Payment::whereHas('installment', fn ($q) => $q->where('loan_id', $loan->id))->lockForUpdate()->exists()) {
+                    $this->fail('cash', 'Pinjaman masih memiliki pembayaran. Batalkan pembayaran terkait terlebih dahulu sebelum membatalkan pencairan.');
+                }
+                $loan->installments()->delete();
+                $loan->delete();
+            }
+            $locked->savings()->delete();
+            Payment::where('cash_entry_id', $locked->id)->delete();
+            $locked->increment('version');
+            $locked->delete();
+            $this->validateSavingHistory($pairs);
+            $this->audit($admin, $locked, 'cancel', $reason, $before);
+
+            return $locked;
+        }, 3);
+    }
+
+    public function changeProof(User $admin, CashEntry $cash, ?string $url): CashEntry
+    {
+        return DB::transaction(function () use ($admin, $cash, $url): CashEntry {
+            $locked = $this->lockCorrection($admin, $cash);
+            if ($locked->trashed()) {
+                $this->fail('cash', 'Transaksi dibatalkan tidak dapat diubah.');
+            }
+            $before = $this->snapshot($locked);
+            $locked->update(['proof_url' => $url]);
+            $locked->increment('version');
+            $this->audit($admin, $locked, 'proof', 'Perubahan tautan bukti pencairan.', $before);
+
+            return $locked;
+        }, 3);
+    }
+
+    private function lockCorrection(User $admin, CashEntry $cash, array $additionalGroups = []): CashEntry
+    {
+        User::whereKey($admin->id)->lockForUpdate()->firstOrFail();
+        Group::whereIn('id', array_unique([$cash->group_id, ...$additionalGroups]))->orderBy('id')->lockForUpdate()->get();
+        $locked = CashEntry::withTrashed()->whereKey($cash->id)->lockForUpdate()->firstOrFail();
+        if ($locked->group_id !== $cash->group_id) {
+            $this->fail('version', 'Transaksi telah dipindahkan admin lain. Muat ulang halaman.');
+        }
+
+        return $locked;
+    }
+
+    private function checkVersion(CashEntry $cash, int $version): void
+    {
+        if ($cash->trashed()) {
+            $this->fail('cash', 'Transaksi dibatalkan tidak dapat diedit.');
+        }
+        if ($cash->version !== $version) {
+            $this->fail('version', 'Transaksi telah diubah admin lain. Muat ulang dan periksa nilai terbaru sebelum menyimpan.');
+        }
+    }
+
+    private function validateSavingHistory(array $pairs): void
+    {
+        $seen = [];
+        foreach ($pairs as $pair) {
+            $key = $pair['member_id'].':'.$pair['type'];
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            Member::whereKey($pair['member_id'])->lockForUpdate()->firstOrFail();
+            $movements = Saving::query()->join('cash_entries', 'cash_entries.id', '=', 'savings.cash_entry_id')
+                ->whereNull('cash_entries.deleted_at')->where('savings.member_id', $pair['member_id'])->where('savings.type', $pair['type'])
+                ->select('cash_entries.direction', 'savings.amount')->orderBy('cash_entries.date')->orderBy('cash_entries.id')->get();
+            $balance = 0;
+            foreach ($movements as $movement) {
+                $balance += $movement->direction === 'in' ? (int) $movement->amount : -(int) $movement->amount;
+                if ($balance < 0) {
+                    $this->fail('rows', 'Koreksi ditolak karena membuat saldo simpanan '.$pair['type'].' negatif pada riwayat anggota #'.$pair['member_id'].'.');
+                }
+            }
+        }
+    }
+
+    private function snapshot(CashEntry $cash): array
+    {
+        $record = CashEntry::withTrashed()->findOrFail($cash->id);
+        $loan = Loan::with(['installments' => fn ($q) => $q->with('payments')->orderBy('sequence')])->where('cash_entry_id', $cash->id)->first();
+
+        return ['cash' => $record->toArray(), 'savings' => $record->savings()->get()->toArray(), 'loan' => $loan?->toArray(), 'payment' => Payment::where('cash_entry_id', $cash->id)->first()?->toArray()];
+    }
+
+    private function audit(User $admin, CashEntry $cash, string $action, string $reason, array $before): void
+    {
+        $cash->revisions()->create(['admin_id' => $admin->id, 'action' => $action, 'reason' => $reason, 'before' => $before, 'after' => $this->snapshot($cash)]);
     }
 
     private function member(int $id, Group $group, bool $active, string $field = 'member_id'): Member
@@ -118,7 +282,7 @@ class TransactionService
 
     private function checkWithdrawal(Member $member, string $type, int $amount, string $date, string $field): void
     {
-        $movements = Saving::query()->join('cash_entries', 'cash_entries.id', '=', 'savings.cash_entry_id')->where('member_id', $member->id)->where('type', $type)->select('cash_entries.date', 'cash_entries.direction', 'savings.amount', 'cash_entries.id')->orderBy('cash_entries.date')->orderBy('cash_entries.id')->get();
+        $movements = Saving::query()->join('cash_entries', 'cash_entries.id', '=', 'savings.cash_entry_id')->whereNull('cash_entries.deleted_at')->where('member_id', $member->id)->where('type', $type)->select('cash_entries.date', 'cash_entries.direction', 'savings.amount', 'cash_entries.id')->orderBy('cash_entries.date')->orderBy('cash_entries.id')->get();
         $balance = 0;
         $applied = false;
         foreach ($movements as $movement) {

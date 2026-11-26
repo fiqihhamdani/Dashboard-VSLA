@@ -10,7 +10,7 @@ class Group extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'code', 'location', 'is_active'];
+    protected $fillable = ['name', 'code', 'location', 'is_active', 'legality_url'];
 
     protected function casts(): array
     {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\CashEntry;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -14,6 +15,9 @@ class ReportRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        if ($this->routeIs('admin.report') && $this->input('scope') === 'all') {
+            $this->merge(['group_id' => null, 'start' => CashEntry::min('date') ?? now()->startOfYear()->toDateString(), 'end' => CashEntry::max('date') ?? now()->toDateString()]);
+        }
         $this->merge(['start' => $this->input('start', now()->startOfYear()->toDateString()), 'end' => $this->input('end', now()->toDateString())]);
     }
 

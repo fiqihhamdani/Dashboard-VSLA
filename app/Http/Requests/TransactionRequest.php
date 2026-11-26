@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\GoogleDriveUrl;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -18,7 +19,7 @@ class TransactionRequest extends FormRequest
 
         return $base + match ($this->input('kind')) {
             'saving' => ['direction' => ['required', Rule::in(['in', 'out'])], 'type' => ['required', Rule::in(['pokok', 'wajib', 'sukarela'])], 'rows' => 'required|array|min:1|max:100', 'rows.*.member_id' => 'required|integer|distinct|exists:members,id', 'rows.*.amount' => 'required|integer|min:1|max:1000000000000'],
-            'loan' => ['member_id' => 'required|integer|exists:members,id', 'principal' => 'required|integer|min:1|max:1000000000000', 'rate' => 'required|regex:/^\d{1,3}(\.\d{1,2})?$/|numeric|min:0|max:100', 'months' => 'required|integer|min:1|max:120'],
+            'loan' => ['proof_url' => ['nullable', 'string', 'max:2048', new GoogleDriveUrl], 'member_id' => 'required|integer|exists:members,id', 'principal' => 'required|integer|min:1|max:1000000000000', 'rate' => 'required|regex:/^\d{1,3}(\.\d{1,2})?$/|numeric|min:0|max:100', 'months' => 'required|integer|min:1|max:120'],
             'payment' => ['member_id' => 'required|integer|exists:members,id', 'installment_id' => 'required|integer|exists:installments,id', 'amount' => 'required|integer|min:1|max:1000000000000000'],
             'other' => ['direction' => ['required', Rule::in(['in', 'out'])], 'amount' => 'required|integer|min:1|max:1000000000000', 'description' => 'required|string|max:500'],
             default => [],

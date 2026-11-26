@@ -44,5 +44,5 @@ if (rows) {
 }
 window.addEventListener('pageshow', () => {
     const button = form?.querySelector('[data-submit-transaction]');
-    if (button) { button.disabled = !form.elements.group_id.value; button.textContent = 'Simpan transaksi'; }
+    if (button) { button.disabled = !form.elements.group_id.value; button.textContent = form.querySelector('[name=_method]')?.value === 'put' ? 'Simpan koreksi' : 'Simpan transaksi'; }
 });

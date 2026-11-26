@@ -9,6 +9,7 @@ use App\Models\Installment;
 use App\Models\Loan;
 use App\Models\Member;
 use App\Models\Payment;
+use App\Rules\GoogleDriveUrl;
 use App\Services\TransactionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -81,6 +82,10 @@ class TransactionController extends Controller
     {
         $cash = $service->store($request->user(), $request->validated());
 
+        if ($cash->trashed()) {
+            return redirect()->route('admin.cash.show', $cash)->with('status', 'Transaksi ini sudah dibatalkan. Pengiriman ulang tidak membuat catatan keuangan baru.');
+        }
+
         if ($cash->category === 'payment') {
             $member = Member::whereKey($request->integer('member_id'))->forTransaction('payment')->first();
 
@@ -93,8 +98,78 @@ class TransactionController extends Controller
 
     public function show(CashEntry $cash): View
     {
-        $cash->load(['group', 'savings.member']);
+        $cash->load(['group', 'savings.member', 'revisions' => fn ($q) => $q->with('admin')->orderByDesc('id')]);
 
         return view('admin.receipt', compact('cash') + ['loan' => Loan::with(['member', 'installments' => fn ($q) => $q->withSum('payments', 'amount')->orderBy('sequence')])->where('cash_entry_id', $cash->id)->first(), 'payment' => Payment::with('installment.loan.member')->where('cash_entry_id', $cash->id)->first()]);
+    }
+
+    public function history(Request $request, string $kind): View
+    {
+        abort_unless(in_array($kind, ['saving', 'loan', 'payment', 'other'], true), 404);
+        $data = $request->validate(['group_id' => 'nullable|integer|exists:groups,id', 'q' => 'nullable|string|max:100', 'start' => 'nullable|date_format:Y-m-d', 'end' => $request->filled('start') ? 'nullable|date_format:Y-m-d|after_or_equal:start' : 'nullable|date_format:Y-m-d']);
+        $request->validate(['state' => 'nullable|in:active,all,cancelled']);
+        $entries = CashEntry::with('group')->when($request->input('state') === 'all', fn ($q) => $q->withTrashed())->when($request->input('state') === 'cancelled', fn ($q) => $q->onlyTrashed())->where('category', $kind)
+            ->when($data['group_id'] ?? null, fn ($query, $id) => $query->where('group_id', $id))
+            ->when($data['q'] ?? null, fn ($query, $q) => $query->where('description', 'like', "%$q%"))
+            ->when($data['start'] ?? null, fn ($query, $date) => $query->where('date', '>=', $date))
+            ->when($data['end'] ?? null, fn ($query, $date) => $query->where('date', '<=', $date))
+            ->orderByDesc('date')->orderByDesc('id')->paginate(20)->withQueryString();
+
+        return view('admin.history', compact('entries', 'kind') + ['groups' => Group::orderBy('name')->get()]);
+    }
+
+    public function edit(Request $request, CashEntry $cash): View
+    {
+        if ($request->boolean('fresh')) {
+            $request->session()->forget('_old_input');
+        }
+        $kind = $cash->category;
+        $cash->load('savings.member');
+        $loan = Loan::where('cash_entry_id', $cash->id)->first();
+        $payment = Payment::with('installment.loan')->where('cash_entry_id', $cash->id)->first();
+        $defaults = ['date' => $cash->date->toDateString(), 'direction' => $cash->direction, 'amount' => $cash->amount, 'description' => $cash->description, 'proof_url' => $cash->proof_url];
+        if ($loan) {
+            $defaults += ['member_id' => $loan->member_id, 'principal' => $loan->principal, 'rate' => number_format($loan->rate_bps / 100, 2, '.', ''), 'months' => $loan->months];
+        }
+        if ($payment) {
+            $defaults += ['member_id' => $payment->installment->loan->member_id, 'installment_id' => $payment->installment_id];
+        }
+        if ($kind === 'saving') {
+            $defaults += ['type' => $cash->savings->first()?->type, 'rows' => $cash->savings->map(fn ($saving) => ['member_id' => $saving->member_id, 'amount' => $saving->amount])->all()];
+        }
+        $groupId = $cash->group_id;
+        $memberId = $defaults['member_id'] ?? null;
+        $rows = $request->old('rows', $defaults['rows'] ?? []);
+        $ids = collect(is_array($rows) ? $rows : [])->filter(is_array(...))->pluck('member_id')->push($request->old('member_id', $memberId))->filter(fn ($id) => is_scalar($id) && ctype_digit((string) $id))->take(101);
+        $selectedMembers = Member::with('group')->whereIn('id', $ids)->get()->keyBy('id');
+        $members = Member::where('group_id', $groupId)->orderBy('name')->limit(20)->get();
+        $bills = Installment::with('loan')->withSum('payments', 'amount')->whereHas('loan', fn ($q) => $q->where('member_id', $memberId))->orderBy('due_date')->orderBy('id')->get();
+
+        return view('admin.transaction', compact('kind', 'groupId', 'memberId', 'selectedMembers', 'members', 'bills', 'defaults') + ['editing' => $cash, 'groups' => Group::orderBy('name')->get(), 'requestKey' => $cash->request_key]);
+    }
+
+    public function update(TransactionRequest $request, CashEntry $cash, TransactionService $service): RedirectResponse
+    {
+        $meta = $request->validate(['reason' => 'required|string|min:3|max:1000', 'version' => 'required|integer|min:0']);
+        $service->revise($request->user(), $cash, $request->validated(), $meta['reason'], (int) $meta['version']);
+
+        return redirect()->route('admin.cash.show', $cash)->with('status', 'Koreksi disimpan. Saldo, tagihan, buku kas, dan laporan sudah mengikuti nilai terbaru.');
+    }
+
+    public function cancel(Request $request, CashEntry $cash, TransactionService $service): RedirectResponse
+    {
+        $data = $request->validate(['reason' => 'required|string|min:3|max:1000', 'version' => 'required|integer|min:0', 'confirmed' => 'accepted']);
+        $service->cancel($request->user(), $cash, $data['reason'], (int) $data['version']);
+
+        return redirect()->route('admin.cash.show', $cash)->with('status', 'Transaksi dibatalkan. Nilainya dikeluarkan dari perhitungan keuangan; riwayat tetap tersimpan.');
+    }
+
+    public function proof(Request $request, CashEntry $cash, TransactionService $service): RedirectResponse
+    {
+        abort_unless($cash->category === 'loan', 404);
+        $data = $request->validate(['proof_url' => ['present', 'nullable', 'string', 'max:2048', new GoogleDriveUrl]]);
+        $service->changeProof($request->user(), $cash, $data['proof_url']);
+
+        return redirect()->route('admin.cash.show', $cash)->with('status', 'Tautan bukti pencairan diperbarui. File Google Drive tidak diubah atau dihapus.');
     }
 }

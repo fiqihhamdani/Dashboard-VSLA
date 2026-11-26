@@ -236,3 +236,5 @@ for (const form of document.querySelectorAll('[data-report-filter]')) {
     form.addEventListener('submit', () => { const button = form.querySelector('[data-apply-filter]'); button.disabled = true; button.querySelector('span').textContent = 'Memuat laporan…'; });
     window.addEventListener('pageshow', () => { const button = form.querySelector('[data-apply-filter]'); button.disabled = false; button.querySelector('span').textContent = 'Terapkan filter'; }); updatePresets();
 }
+
+import './admin-management';

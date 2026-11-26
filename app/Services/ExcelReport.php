@@ -23,13 +23,18 @@ class ExcelReport
         foreach ($ledger as $row) {
             $cash[] = [$row['date'], $row['group'], $row['description'], $row['in'], $row['out'], $row['balance']];
         }
+
+        return $this->workbook(['Ringkasan' => $summary, 'Rekap Bulanan' => $monthly, 'Buku Kas' => $cash]);
+    }
+
+    public function workbook(array $sheets): string
+    {
         $path = tempnam(storage_path('app/private'), 'vsla-');
         $zip = new ZipArchive;
         if ($zip->open($path, ZipArchive::OVERWRITE) !== true) {
             throw new RuntimeException('Tidak dapat membuat laporan Excel.');
         }
         try {
-            $sheets = ['Ringkasan' => $summary, 'Rekap Bulanan' => $monthly, 'Buku Kas' => $cash];
             $types = '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>';
             $workbook = '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>';
             $rels = '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
@@ -44,7 +49,7 @@ class ExcelReport
                     $xml .= '<row r="'.($index + 1).'">';
                     foreach ($row as $column => $value) {
                         $ref = chr(65 + $column).($index + 1);
-                        $style = ($name === 'Ringkasan' && ($row[0] ?? '') === 'Anggota aktif saat ini') ? 0 : 1;
+                        $style = ($name === 'Data' || ($name === 'Ringkasan' && ($row[0] ?? '') === 'Anggota aktif saat ini')) ? 0 : 1;
                         $xml .= is_int($value) ? '<c r="'.$ref.'" s="'.$style.'"><v>'.$value.'</v></c>' : '<c r="'.$ref.'" t="inlineStr"><is><t xml:space="preserve">'.htmlspecialchars(preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/u', '', (string) $value), ENT_XML1 | ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</t></is></c>';
                     }
                     $xml .= '</row>';
